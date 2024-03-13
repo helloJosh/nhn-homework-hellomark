@@ -1,17 +1,15 @@
 package com.nhnacademy;
 
-import java.util.concurrent.Semaphore;
-
 public class Item{
     public static final String[] items = {
         "GPU", "CPU", "NIC", "MONITOR", "AP"
     };
-    private Semaphore semaphore;
+    private MySemaphore semaphore;
     private String name;
     private int currentQuantity;
     private int maxQuantity;
     public Item(String name, int maxQuantity){
-        semaphore = new Semaphore(1,true);
+        semaphore = new MySemaphore(1);
         this.name = name;
         this.maxQuantity = maxQuantity;
         this.currentQuantity = 4;
@@ -32,11 +30,7 @@ public class Item{
         return semaphore.tryAcquire();
     }
     public void semaphoreAcquire(){
-        try {
-            this.semaphore.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        this.semaphore.acquire();
     }
     public boolean hasAvailableSlot(){
         return semaphore.availablePermits() == 1;

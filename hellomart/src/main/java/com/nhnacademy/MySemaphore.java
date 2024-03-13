@@ -38,4 +38,17 @@ public class MySemaphore {
     public int availablePermits(){
         return this.flag;
     }
+    public boolean tryAcquire() {
+        lock.lock();
+        try {
+            if (flag > 0) {
+                flag--;
+                return true;
+            } else {
+                return false;
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
 }
