@@ -72,7 +72,7 @@ public class Store implements Runnable{
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() < 10l){
+                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() > 10l){
                     logger.warn("생산자 물건 납품 포기");
                     return;
                 }
@@ -108,7 +108,7 @@ public class Store implements Runnable{
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() < 10l){
+                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() > 10l){
                     logger.warn("소비자 물건 구매 포기");
                     return;
                 }

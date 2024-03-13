@@ -6,7 +6,7 @@ public class Consumer implements Runnable{
     public static final int TOTAL_CONSUMER = 10;
     private final Store store;
     private String name;
-    
+
     public Consumer(Store store, String name){
         this.store = store;
         this.name = name;
@@ -23,5 +23,8 @@ public class Consumer implements Runnable{
                 Thread.currentThread().interrupt();
             }
         }
+    }
+    public String getName() {
+        return name;
     }
 }

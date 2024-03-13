@@ -23,4 +23,7 @@ public class Producer implements Runnable{
             }
         }
     }
+    public String getName() {
+        return name;
+    }
 }
