@@ -11,10 +11,10 @@ public class Item{
     private int currentQuantity;
     private int maxQuantity;
     public Item(String name, int maxQuantity){
-        semaphore = new Semaphore(1);
+        semaphore = new Semaphore(1,true);
         this.name = name;
         this.maxQuantity = maxQuantity;
-        this.currentQuantity = 0;
+        this.currentQuantity = 4;
     }
     public String getName() {
         return name;
@@ -33,7 +33,7 @@ public class Item{
     }
     public void semaphoreAcquire(){
         try {
-            semaphore.acquire();
+            this.semaphore.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -42,7 +42,7 @@ public class Item{
         return semaphore.availablePermits() == 1;
     }
     public void semaphoreLogout() {
-        semaphore.release();
+        this.semaphore.release();
     }
 
     

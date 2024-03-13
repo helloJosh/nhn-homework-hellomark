@@ -4,15 +4,26 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class Store implements Runnable{
     public static final int MAX_CONSUMER_INSTORE = 5;
     public static final int MAX_PRODUCER_INSTORE = 5;
     public static final int ITEM_TYPE_COUNT = 5;
+    Logger logger = LogManager.getLogger(this.getClass().getSimpleName());
+
     private List<Item> itemList = new ArrayList<>();
+    //private Semaphore[] semaphores;
     private ExecutorService consumerExecutor;
     private ExecutorService producerExecutor;
     private Instant constructorStoreTime;
@@ -34,6 +45,10 @@ public class Store implements Runnable{
         getItemList().add(new Item("NIC", 3));
         getItemList().add(new Item("MONITOR", 10));
         getItemList().add(new Item("AP", 9));
+        // this.semaphores = new Semaphore[getItemList().size()];
+        // for(int i=0; i<getItemList().size();i++){
+        //     semaphores[i] = new Semaphore(getItemList().get(i).getCurrentQuantity());
+        // }
 
         for(int i=0; i< Consumer.TOTAL_CONSUMER ; i++){
             getConsumerExecutor().submit(new Consumer(this,"consumer"+(i+1)));
@@ -43,9 +58,8 @@ public class Store implements Runnable{
         }
     }
 
-    public synchronized void buy(){
-        setEnterProducerTime(Instant.now());
-        setRunningProducerTime(Instant.now());
+    public void buy(){
+
         int toBuyItemTypeNumber = ThreadLocalRandom.current().nextInt(1,ITEM_TYPE_COUNT);
         int[] toBuyItemNumber = new int[toBuyItemTypeNumber];
         for(int i=0;i<toBuyItemTypeNumber;i++){
@@ -56,45 +70,31 @@ public class Store implements Runnable{
                 }
             }
         }
-
-        while(Duration.between(getEnterProducerTime(), getRunningProducerTime()).toSeconds()>60l && isItemFull(toBuyItemTypeNumber, toBuyItemNumber)){
-            try{
-                wait();
-                setRunningProducerTime(Instant.now());
-            } catch (InterruptedException e){
-                Thread.currentThread().interrupt();
-            }
-        }
-        buyAllItems(toBuyItemTypeNumber, toBuyItemNumber);
-        notifyAll();
-    }
-    public synchronized void buyAllItems(int toBuyItemTypeNumber, int[] toBuyItemNumber){
-        System.out.println("===== 생산자 트랜잭션 시작 =====");
-        for(int i=0;i<toBuyItemTypeNumber;i++){
+        for(int i=0; i<toBuyItemTypeNumber;i++){
             Item tempItem = getItemList().get(toBuyItemNumber[i]);
-            if(tempItem.hasAvailableSlot() 
-                    && tempItem.getCurrentQuantity() < tempItem.getMaxQuantity()){
-                tempItem.semaphoreAcquire();
-                tempItem.setCurrentQuantity(tempItem.getCurrentQuantity()+1);   
-                System.out.println("가게에서 "+tempItem.getName()+"을 1개 납품 받았습니다, 총 재고 : "+tempItem.getCurrentQuantity());
+            tempItem.semaphoreAcquire();
+            enterProducerTime = Instant.now();
+            while(tempItem.getCurrentQuantity() + 1 > tempItem.getMaxQuantity()){
                 tempItem.semaphoreLogout();
+                try {
+                    Thread.sleep(100);
+                    runningProducerTime = Instant.now();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() < 10l)
+                    return;
+                tempItem.semaphoreAcquire();
             }
+
+            tempItem.setCurrentQuantity(tempItem.getCurrentQuantity()+1);
+            logger.info("가게에서 {} 을 1개 납품 받았습니다, 총 재고 : {}",tempItem.getName(),tempItem.getCurrentQuantity());
+            System.out.println("가게에서 "+tempItem.getName()+"을 1개 납품 받았습니다, 총제고: "+tempItem.getCurrentQuantity() +"납품");
+            tempItem.semaphoreLogout();
         }
-        System.out.println("===== 트랜잭션 끝 =====");
-    }
-    public boolean isItemFull(int toBuyItemTypeNumber, int[] toBuyItemNumber){
-        for(int i=0;i<toBuyItemTypeNumber;i++){
-            Item tempItem = getItemList().get(toBuyItemNumber[i]);
-            if(tempItem.getCurrentQuantity() == tempItem.getMaxQuantity()){
-                return true;
-            }
-        }
-        return false;
     }
 
-    public synchronized void sell(){
-        setEnterConsumerTime(Instant.now());
-        setRunningConsumerTime(Instant.now());
+    public void sell(){
         int toSellItemTypeNumber = ThreadLocalRandom.current().nextInt(1,ITEM_TYPE_COUNT);
         int[] toSellItemNumber = new int[toSellItemTypeNumber];
         for(int i=0;i<toSellItemTypeNumber;i++){
@@ -105,39 +105,28 @@ public class Store implements Runnable{
                 }
             }
         }
-        while(Duration.between(getEnterConsumerTime(), getRunningConsumerTime()).toSeconds()>60l && isItemEmpty(toSellItemTypeNumber, toSellItemNumber)){
-            try{
-                wait();
-                setRunningProducerTime(Instant.now());
-            } catch (InterruptedException e){
-                Thread.currentThread().interrupt();
-            }
-        }
-        sellAllItems(toSellItemTypeNumber, toSellItemNumber);
-        notifyAll();
-    }
-    public void sellAllItems(int toSellItemTypeNumber, int[] toSellItemNumber){
-        System.out.println("===== 소비자 트랜잭션 시작 =====");
-        for(int i=0;i<toSellItemTypeNumber;i++){
+        for(int i=0; i<toSellItemTypeNumber;i++){
             Item tempItem = getItemList().get(toSellItemNumber[i]);
-            if(tempItem.hasAvailableSlot() 
-                    && tempItem.getCurrentQuantity()>0){
-                tempItem.semaphoreAcquire();
-                tempItem.setCurrentQuantity(tempItem.getCurrentQuantity()-1);   
-                System.out.println("가게에서 "+tempItem.getName()+"을 1개 팔았습니다, 총 재고 : "+tempItem.getCurrentQuantity());
+            tempItem.semaphoreAcquire();
+            enterConsumerTime = Instant.now();
+            while(tempItem.getCurrentQuantity() < 1){
                 tempItem.semaphoreLogout();
+                try {
+                    Thread.sleep(100);
+                    runningConsumerTime = Instant.now();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                if(Duration.between(getConstructorStoreTime(), getRunningStoreTime()).toSeconds() < 10l)
+                    return;
+                tempItem.semaphoreAcquire();
             }
+
+            tempItem.setCurrentQuantity(tempItem.getCurrentQuantity()-1);
+            logger.info("가게에서 {} 을 1개 팔았습니다, 총 재고 : {}",tempItem.getName(),tempItem.getCurrentQuantity());
+            System.out.println("가게에서 "+tempItem.getName()+"을 1개 팔았습니다, 총재고 :"+tempItem.getCurrentQuantity());
+            tempItem.semaphoreLogout();
         }
-        System.out.println("===== 트랜잭션 끝 =====");
-    }
-    public boolean isItemEmpty(int toSellItemTypeNumber, int[] toSellItemNumber){
-        for(int i=0;i<toSellItemTypeNumber;i++){
-            Item tempItem = getItemList().get(toSellItemNumber[i]);
-            if(tempItem.getCurrentQuantity() < 2){
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -148,6 +137,8 @@ public class Store implements Runnable{
         }
         consumerExecutor.shutdownNow();
         producerExecutor.shutdownNow();
+        logger.warn("가게 문 닫습니다.");
+        System.out.println("가게 문 닫다요");
     }
     
 

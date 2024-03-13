@@ -15,11 +15,11 @@ public class Producer implements Runnable{
     @Override
     public void run(){
         while(true){
-            store.buy();
-            System.out.println(this.name);
-            System.out.println();
             try{
-                Thread.sleep(ThreadLocalRandom.current().nextInt(20000,30000));
+                store.buy();
+                System.out.println(this.name);
+                System.out.println();
+                Thread.sleep(ThreadLocalRandom.current().nextInt(10000,20000));
             } catch (InterruptedException e){
                 Thread.currentThread().interrupt();
             }

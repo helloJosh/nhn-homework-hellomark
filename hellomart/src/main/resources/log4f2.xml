@@ -19,7 +19,7 @@
     </Appenders>
 
     <Loggers>
-        <Root level="trace">
+        <Root level="log">
             <AppenderRef ref="console"/>
         </Root>
     </Loggers>
